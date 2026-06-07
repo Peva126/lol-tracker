@@ -4,14 +4,14 @@ import asyncio
 from datetime import datetime
 
 # Configuration
-DISCORD_TOKEN = "your-discord-token"
-RIOT_API_KEY = "your-riot-api-key"
+DISCORD_TOKEN = "YOUR BOT TOKEN"
+RIOT_API_KEY = "YOUR KEY"
 CHANNEL_ID = 0  # Your Discord channel ID
 
-SUMMONER_NAME = "summoner-name"
-SUMMONER_TAG = "summoner-tag"
-REGION = "europe"
-PLATFORM = "euw1"
+SUMMONER_NAME = "YOUR IGN"
+SUMMONER_TAG = "YOUR RANK"
+REGION = "YOUR REGION"
+PLATFORM = "YOUR PLATFORM" # ex. euw1 
 
 # Memory of notified matches
 notified_matches = set()
@@ -61,8 +61,20 @@ async def get_match_details(match_id, puuid):
                 "date": data["info"]["gameStartTimestamp"]
             }
 
+async def get_rank(puuid):
+    url = f"https://{PLATFORM}.api.riotgames.com/lol/league/v4/entries/by-puuid/{puuid}"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers={"X-Riot-Token": RIOT_API_KEY}) as r:
+            data = await r.json()
+            
+            ranked = next((e for e in data if e["queueType"] == "RANKED_SOLO_5x5"), None)
+            
+            if ranked:
+                return f"{ranked['tier']} {ranked['rank']} — {ranked['leaguePoints']} LP"
+            else:
+                return "Unranked"
 
-async def send_notification(channel, details, match_id):
+async def send_notification(channel, details, match_id, rank):
     result = "✅ VICTORY" if details["win"] else "❌ DEFEAT"
     color = 0x00ff00 if details["win"] else 0xff0000
     icon_url = f"https://ddragon.leagueoflegends.com/cdn/14.24.1/img/champion/{details['champion']}.png"
@@ -79,6 +91,7 @@ async def send_notification(channel, details, match_id):
     embed.add_field(name="Wards", value=details['wards_placed'], inline=True)
     embed.add_field(name="Vision", value=details['vision_score'], inline=True)
     embed.add_field(name="Towers", value=details['towers'], inline=True)
+    embed.add_field(name="Rank", value=rank, inline=True)
 
     match_date = datetime.fromtimestamp(details['date'] / 1000).strftime("%d/%m/%Y %H:%M")
     embed.set_footer(text=f"Match ID: {match_id} · {match_date}")
@@ -93,8 +106,9 @@ async def check_matches(puuid):
 
             if match_id and match_id not in notified_matches:
                 details = await get_match_details(match_id, puuid)
+                rank = await get_rank(puuid)
                 channel = client.get_channel(CHANNEL_ID)
-                await send_notification(channel, details, match_id)
+                await send_notification(channel, details, match_id, rank)
                 notified_matches.add(match_id)
 
         except Exception as e:
@@ -111,4 +125,4 @@ async def on_ready():
     asyncio.create_task(check_matches(puuid))
 
 
-client.run(DISCORD_TOKEN)
+client.run(DISCORD TOKEN)
