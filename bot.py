@@ -4,14 +4,22 @@ import asyncio
 from datetime import datetime
 
 # Configuration
-DISCORD_TOKEN = "YOUR BOT TOKEN"
-RIOT_API_KEY = "YOUR KEY"
+DISCORD_TOKEN = "your-discord-token"
+RIOT_API_KEY = "your-riot-api-key"
 CHANNEL_ID = 0  # Your Discord channel ID
 
-SUMMONER_NAME = "YOUR IGN"
-SUMMONER_TAG = "YOUR RANK"
-REGION = "YOUR REGION"
-PLATFORM = "YOUR PLATFORM" # ex. euw1 
+SUMMONER_NAME = "summoner-name"
+SUMMONER_TAG = "summoner-tag"
+REGION = "europe"
+PLATFORM = "euw1"
+
+QUEUE_TYPES = {
+    420: "Ranked Solo/Duo",
+    440: "Ranked Flex",
+    400: "Normal Draft",
+    430: "Normal Blind",
+    450: "ARAM"
+}
 
 # Memory of notified matches
 notified_matches = set()
@@ -58,21 +66,24 @@ async def get_match_details(match_id, puuid):
                 "wards_placed": player["wardsPlaced"],
                 "vision_score": player["visionScore"],
                 "towers": player["turretKills"],
-                "date": data["info"]["gameStartTimestamp"]
+                "date": data["info"]["gameStartTimestamp"],
+                "queue": QUEUE_TYPES.get(data["info"]["queueId"], "Other")
             }
+
 
 async def get_rank(puuid):
     url = f"https://{PLATFORM}.api.riotgames.com/lol/league/v4/entries/by-puuid/{puuid}"
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers={"X-Riot-Token": RIOT_API_KEY}) as r:
             data = await r.json()
-            
+
             ranked = next((e for e in data if e["queueType"] == "RANKED_SOLO_5x5"), None)
-            
+
             if ranked:
                 return f"{ranked['tier']} {ranked['rank']} — {ranked['leaguePoints']} LP"
             else:
                 return "Unranked"
+
 
 async def send_notification(channel, details, match_id, rank):
     result = "✅ VICTORY" if details["win"] else "❌ DEFEAT"
@@ -84,6 +95,7 @@ async def send_notification(channel, details, match_id, rank):
         color=color
     )
     embed.set_thumbnail(url=icon_url)
+    embed.add_field(name="Mode", value=details['queue'], inline=True)
     embed.add_field(name="KDA", value=f"{details['kills']}/{details['deaths']}/{details['assists']}", inline=True)
     embed.add_field(name="Damage", value=f"{details['damage']:,}", inline=True)
     embed.add_field(name="Duration", value=f"{details['duration']} min", inline=True)
@@ -91,7 +103,9 @@ async def send_notification(channel, details, match_id, rank):
     embed.add_field(name="Wards", value=details['wards_placed'], inline=True)
     embed.add_field(name="Vision", value=details['vision_score'], inline=True)
     embed.add_field(name="Towers", value=details['towers'], inline=True)
-    embed.add_field(name="Rank", value=rank, inline=True)
+
+    if details["queue"] in ["Ranked Solo/Duo", "Ranked Flex"]:
+        embed.add_field(name="Rank", value=rank, inline=True)
 
     match_date = datetime.fromtimestamp(details['date'] / 1000).strftime("%d/%m/%Y %H:%M")
     embed.set_footer(text=f"Match ID: {match_id} · {match_date}")
@@ -125,4 +139,4 @@ async def on_ready():
     asyncio.create_task(check_matches(puuid))
 
 
-client.run(DISCORD TOKEN)
+client.run(DISCORD_TOKEN)
