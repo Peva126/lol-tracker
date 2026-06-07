@@ -94,6 +94,7 @@ async def send_notification(channel, details, match_id, rank):
         title=f"{result} — {details['champion']}",
         color=color
     )
+    embed.set_author(name=f"{SUMMONER_NAME} #{SUMMONER_TAG}")
     embed.set_thumbnail(url=icon_url)
     embed.add_field(name="Mode", value=details['queue'], inline=True)
     embed.add_field(name="KDA", value=f"{details['kills']}/{details['deaths']}/{details['assists']}", inline=True)
